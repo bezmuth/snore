@@ -5,7 +5,7 @@ use rocket::form::Form;
 use rocket_dyn_templates::{Template, context};
 use rocket::http::{Cookie, CookieJar};
 use chrono::prelude::*;
-use serde;
+
 use std::cmp::Ordering;
 use std::collections::{HashMap};
 use url::Url;
@@ -51,22 +51,22 @@ fn parse_domain(url: String) -> String{
 fn check_cookie(cookies: &CookieJar<'_>, users: &sled::Db, username : &str) -> bool{
     if let Some(token) = cookies.get("token"){
         println!("{}", token.value());
-        if db::check_token(username, &token.value(), users){
+        if db::check_token(username, token.value(), users){
             return true
         }
     }
-    return false
+    false
 }
 
 #[get("/login")]
-fn login(users : &State<Users>) -> Template {
+fn login(_users : &State<Users>) -> Template {
     Template::render("login", context! {})
 }
 
 #[post("/login", data = "<login_data>")]
 fn login_post(cookies: &CookieJar<'_>, users : &State<Users>, login_data : Form<Vec<String>>) -> Flash<Redirect> {
     if let Some(token) = db::tryLogin(&login_data.clone()[0], &login_data[1], &users.0){
-        cookies.add(Cookie::new("token", token.to_string()));
+        cookies.add(Cookie::new("token", token));
         cookies.add(Cookie::new("user", login_data[0].clone()));
         Flash::success(Redirect::to(format!("/{}", login_data[0])), "Login")
     } else {
@@ -78,7 +78,7 @@ fn login_post(cookies: &CookieJar<'_>, users : &State<Users>, login_data : Form<
 #[post("/<user>/submit", data = "<feeds>")]
 fn feedsUpdate(cookies: &CookieJar<'_>, user : &str, users : &State<Users>, feeds : Form<String>) -> Flash<Redirect> {
     if check_cookie(cookies, &users.0, user){
-        let feed_list = db::getUsersFeeds(user, &users.0);
+        let _feed_list = db::getUsersFeeds(user, &users.0);
         let feeds = feeds
             .into_inner()
             .lines()
@@ -101,43 +101,17 @@ fn settingsPage(cookies: &CookieJar<'_>, user : &str, users : &State<Users>) -> 
             logged_in : true,
         });
     }
-    return Template::render("error", context!{})
+    Template::render("error", context!{})
 }
 
 
 #[get("/<user>")]
 fn userPage(cookies: &CookieJar<'_>, user : &str, users : &State<Users>, feed_cache : &State<FeedCache>) -> Template {
-    let mut logged_in = false;
+    let _logged_in = false;
     let feed_list = db::getUsersFeeds(user, &users.0);
     let mut feed_items : Vec<FeedItem> = vec![];
     for addr in feed_list{
-        if feed_cache.0.lock().unwrap().contains_key(&addr){
-            let items = &mut feed_cache.0.lock().unwrap().get(&addr).unwrap().to_vec();
-            // if the last item in the vector (i.e. the most recent) is stale, reload the feed
-            if items.last().unwrap().stale_time+600 > Utc::now().timestamp(){
-                items.last_mut().unwrap().stale_time = Utc::now().timestamp(); // gotta do this so we dont infinitley reload the feed if nothing new apears
-                let feed_data: String = ureq::get(&addr)
-                    .set("Example-Header", "header value")
-                    .call()
-                    .unwrap()
-                    .into_string()
-                    .unwrap();
-                let parsed_feed = feed::parse_feed_data(&feed_data);
-                let items_as_links : Vec<String> = items.into_iter().map(|x| x.link.clone()).collect();
-                for entry in parsed_feed.entries{
-                    if !(items_as_links.contains(&entry.links[0].href.clone())){
-                        items.push(FeedItem {
-                            title : entry.title.unwrap().content,
-                            link : entry.links[0].href.clone(),
-                            date : entry.published.unwrap_or_else(|| Utc::now()).timestamp(),
-                            site : parse_domain(addr.clone()),
-                            stale_time : Utc::now().timestamp()
-                        });
-                    }
-                }
-            }
-            feed_items.append(items);
-        }else{
+        if let std::collections::hash_map::Entry::Vacant(e) = feed_cache.0.lock().unwrap().entry(addr.clone()) {
             let mut curr_items = vec![];
             let feed_data: String = ureq::get(&addr)
                 .set("Example-Header", "header value")
@@ -150,14 +124,40 @@ fn userPage(cookies: &CookieJar<'_>, user : &str, users : &State<Users>, feed_ca
                 let item = FeedItem {
                     title : entry.title.unwrap().content,
                     link : entry.links[0].href.clone(),
-                    date : entry.published.unwrap_or_else(|| Utc::now()).timestamp(),
+                    date : entry.published.unwrap_or_else(Utc::now).timestamp(),
                     site : parse_domain(addr.clone()),
                     stale_time : Utc::now().timestamp()
                 };
                 feed_items.push(item.clone());
                 curr_items.push(item.clone());
             }
-            feed_cache.0.lock().unwrap().insert(addr, curr_items);
+            e.insert(curr_items);
+        } else {
+            let items = &mut feed_cache.0.lock().unwrap().get(&addr).unwrap().to_vec();
+            // if the last item in the vector (i.e. the most recent) is stale, reload the feed
+            if items.last().unwrap().stale_time+600 > Utc::now().timestamp(){
+                items.last_mut().unwrap().stale_time = Utc::now().timestamp(); // gotta do this so we dont infinitley reload the feed if nothing new apears
+                let feed_data: String = ureq::get(&addr)
+                    .set("Example-Header", "header value")
+                    .call()
+                    .unwrap()
+                    .into_string()
+                    .unwrap();
+                let parsed_feed = feed::parse_feed_data(&feed_data);
+                let items_as_links : Vec<String> = items.iter_mut().map(|x| x.link.clone()).collect();
+                for entry in parsed_feed.entries{
+                    if !(items_as_links.contains(&entry.links[0].href.clone())){
+                        items.push(FeedItem {
+                            title : entry.title.unwrap().content,
+                            link : entry.links[0].href.clone(),
+                            date : entry.published.unwrap_or_else(Utc::now).timestamp(),
+                            site : parse_domain(addr.clone()),
+                            stale_time : Utc::now().timestamp()
+                        });
+                    }
+                }
+            }
+            feed_items.append(items);
         }
 
     }

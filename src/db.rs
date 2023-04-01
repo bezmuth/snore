@@ -1,6 +1,6 @@
-use rocket::log::private::Metadata;
-use sled;
-use bincode::{config, Decode, Encode};
+
+
+use bincode::{Decode, Encode};
 use rand::{distributions::Alphanumeric, Rng};
 
 #[derive(Encode, Decode, PartialEq, Debug)]
@@ -20,7 +20,7 @@ pub fn init() -> sled::Db {
     let bins = bincode::encode_to_vec(exampleData, bincode::config::standard()).unwrap();
     let db: sled::Db = sled::open("db.sled").unwrap();
     db.insert(b"reocha", bins);
-    return db
+    db
 }
 
 fn decodeUserValue(userBytes: sled::IVec) -> userValue {
@@ -60,7 +60,7 @@ pub fn tryLogin(username : &str, password : &str, db : &sled::Db) -> Option<Stri
             return Some(token)
         }
     }
-    return None
+    None
 }
 
 pub fn check_token(username : &str, token: &str, db : &sled::Db) -> bool{
@@ -70,5 +70,5 @@ pub fn check_token(username : &str, token: &str, db : &sled::Db) -> bool{
             return true
         }
     }
-    return false
+    false
 }
