@@ -14,7 +14,6 @@ struct FeedCache(sled::Db);
 
 fn check_cookie(cookies: &CookieJar<'_>, users: &sled::Db, username: &str) -> bool {
     if let Some(token) = cookies.get("token") {
-        println!("{}", token.value());
         if db::check_token(username, token.value(), users) {
             return true;
         }
@@ -43,7 +42,7 @@ fn login_post(
 }
 
 #[post("/<user>/submit", data = "<feeds>")]
-fn feedsUpdate(
+fn feeds_update(
     cookies: &CookieJar<'_>,
     user: &str,
     users: &State<Users>,
@@ -63,7 +62,7 @@ fn feedsUpdate(
 }
 
 #[get("/<user>/settings")]
-fn settingsPage(cookies: &CookieJar<'_>, user: &str, users: &State<Users>) -> Template {
+fn settings_page(cookies: &CookieJar<'_>, user: &str, users: &State<Users>) -> Template {
     if check_cookie(cookies, &users.0, user) {
         let feed_list = db::get_users_feeds(user, &users.0);
         return Template::render(
@@ -79,7 +78,7 @@ fn settingsPage(cookies: &CookieJar<'_>, user: &str, users: &State<Users>) -> Te
 }
 
 #[get("/<user>")]
-fn userPage(
+fn user_page(
     cookies: &CookieJar<'_>,
     user: &str,
     users: &State<Users>,
@@ -96,7 +95,7 @@ fn userPage(
     feed_items.reverse();
 
     Template::render(
-        "index",
+        "user",
         context! {
             username: user,
             items: feed_items,
@@ -105,6 +104,17 @@ fn userPage(
     )
 }
 
+#[get("/")]
+fn index(cookies: &CookieJar<'_>) -> Template {
+    let mut user = "";
+    let mut logged_in = false;
+    if let Some(username) = cookies.get("user") {
+        user = username.value();
+        logged_in = true;
+    }
+
+    Template::render("index", context! {logged_in: logged_in, username: user})
+}
 #[launch]
 pub fn rocket() -> _ {
     let users = Users(db::init());
@@ -113,7 +123,14 @@ pub fn rocket() -> _ {
     rocket::build()
         .mount(
             "/",
-            routes![userPage, settingsPage, feedsUpdate, login, login_post],
+            routes![
+                index,
+                user_page,
+                settings_page,
+                feeds_update,
+                login,
+                login_post
+            ],
         )
         .attach(Template::fairing())
         .manage(users)

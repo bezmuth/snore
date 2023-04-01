@@ -4,8 +4,6 @@ use feed_rs::parser;
 use std::cmp::Ordering;
 use url::Url;
 
-use crate::db::update_user_feeds;
-
 #[derive(Eq, PartialEq, serde::Serialize, Clone, Encode, Decode)]
 pub struct FeedItem {
     date: i64,
@@ -91,7 +89,7 @@ pub fn get_feed(addr: String, feed_db: &sled::Db) -> Vec<FeedItem> {
             }
             update_feed(addr, feed.clone(), feed_db)
         }
-        return feed;
+        feed
     } else {
         let feed_data: String = ureq::get(&addr)
             .set("Example-Header", "header value")
@@ -112,6 +110,6 @@ pub fn get_feed(addr: String, feed_db: &sled::Db) -> Vec<FeedItem> {
             curr_items.push(item.clone());
         }
         update_feed(addr, curr_items.clone(), feed_db);
-        return curr_items;
+        curr_items
     }
 }
