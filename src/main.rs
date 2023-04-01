@@ -93,7 +93,7 @@ fn feedsUpdate(cookies: &CookieJar<'_>, user : &str, users : &State<Users>, feed
 
 #[get("/<user>/settings")]
 fn settingsPage(cookies: &CookieJar<'_>, user : &str, users : &State<Users>) -> Template {
-    if checkCookie(cookies, &users.0, user){
+    if check_cookie(cookies, &users.0, user){
         let feed_list = db::getUsersFeeds(user, &users.0);
         return Template::render("settings", context! {
             feeds : feed_list,
@@ -167,7 +167,7 @@ fn userPage(cookies: &CookieJar<'_>, user : &str, users : &State<Users>, feed_ca
     Template::render("index", context! {
         username: user,
         items: feed_items,
-        logged_in: checkCookie(cookies, &users.0, user),
+        logged_in: check_cookie(cookies, &users.0, user),
     })
 }
 
