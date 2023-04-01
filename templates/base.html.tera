@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Snore Feeds</title>
+    <style>
+      {% include "style" %}
+    </style>
+  </head>
+  <body>
+    {% include "nav" %}
+
+    {% block content %}{% endblock content %}
+
+      <footer>
+        <nav></nav>
+      </footer>
+  </body>
+</html>

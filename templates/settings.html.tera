@@ -1,0 +1,12 @@
+{% extends "base" %}
+
+{% block content %}
+
+<form method="POST" action="/{{ username }}/submit">
+<textarea name="submit" rows="10" cols="50">{% for feed in feeds %}{{ feed }}
+{% endfor %}</textarea>
+<br>
+<input type="submit" value="update feeds">
+</form>
+
+{% endblock content %}

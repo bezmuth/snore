@@ -1,0 +1,17 @@
+{% extends "base" %}
+
+{% block content %}
+<ul>
+    {% for item in items %}
+    <a href="{{item.link}}">
+        <li>
+            {{item.title}}
+            <span class=puny>
+                {{item.site}}
+            </span>
+        </li>
+    </a>
+    {% endfor %}
+</ul>
+
+{% endblock content %}

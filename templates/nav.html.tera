@@ -1,0 +1,18 @@
+<nav>
+    <hr>
+    <span class=left-text>
+      {% set phrases = ["( -_•)╦̵̵̿╤─ - - -- - snore", "sleeping on feeds since 20XX", "tfw new rss post (⊙ _ ⊙ )", "( ˘͈ ᵕ ˘͈♡) <3", "snoreposting"]%}
+      {% set phraseIndex = get_random(start=0, end=phrases | length ) %}
+      | {{ phrases[phraseIndex] }}
+    </span>
+    <span class=right-text>
+        {% if logged_in %}
+        <a href="/{{username}}">feeds</a></h3> |
+        <a href="/{{username}}/settings">settings</a></h3>
+        {% else %}
+        <a href="/login">login</a>
+        {% endif %}
+        |
+    </span>
+    <hr>
+</nav>

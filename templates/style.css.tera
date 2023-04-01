@@ -1,0 +1,60 @@
+{% raw %}
+html {
+  font-family: monospace;
+  max-width: 550px;
+  margin: 10px auto;
+  /* make sure the scrollbar is always shown so
+     the width doesnt change between pages */
+  overflow-y: scroll;
+  font-size: 120%;
+  line-height: 1.6;
+}
+
+a {
+  text-decoration: none;
+}
+
+a:hover {
+  background-color: #eaddca;
+}
+
+ul a:hover li {
+  background-color: #eaddca;
+}
+
+h2 {
+  text-align: center;
+}
+
+ul {
+  list-style-type: none;
+  padding-left: 30px;
+  padding-right: 30px;
+}
+
+ul li {
+  padding: 0.5rem;
+  font-size: 1.1rem;
+}
+
+nav a {
+  border-bottom: 1px dotted #000;
+  color: #000;
+}
+
+.left-text {
+  display: inline-block;
+  overflow-wrap: break-word;
+  max-width: 80%;
+}
+
+.right-text {
+  float: right;
+  display: inline-block;
+}
+
+.puny {
+  color: grey;
+  font-size: 0.75rem;
+}
+{% endraw %}
