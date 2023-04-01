@@ -9,18 +9,7 @@ struct UserValue {
 }
 
 pub fn init() -> sled::Db {
-    let example_data = UserValue {
-        feeds: vec![
-            "https://xeiaso.net/blog.rss".to_string(),
-            "https://100r.co/links/rss.xml".to_string(),
-            "https://asahilinux.org/blog/index.xml".to_string(),
-        ],
-        phash: "deadbeef".to_string(),
-        token: "1".to_string(),
-    };
-    let bins = bincode::encode_to_vec(example_data, bincode::config::standard()).unwrap();
     let db: sled::Db = sled::open("db.sled").unwrap();
-    db.insert(b"reocha", bins).unwrap();
     db
 }
 
@@ -40,6 +29,7 @@ pub fn update_user_feeds(user: &str, db: &sled::Db, feeds: Vec<String>) {
     let bins = bincode::encode_to_vec(new_data, bincode::config::standard()).unwrap();
     db.remove(user.as_bytes()).unwrap();
     db.insert(user.as_bytes(), bins).unwrap();
+    let _ = db.flush();
 }
 
 fn update_user_token(user: &str, db: &sled::Db, token: String) {
@@ -48,6 +38,7 @@ fn update_user_token(user: &str, db: &sled::Db, token: String) {
     let bins = bincode::encode_to_vec(new_data, bincode::config::standard()).unwrap();
     db.remove(user.as_bytes()).unwrap();
     db.insert(user.as_bytes(), bins).unwrap();
+    let _ = db.flush();
 }
 
 pub fn try_login(username: &str, password: &str, db: &sled::Db) -> Option<String> {

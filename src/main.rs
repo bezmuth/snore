@@ -1,52 +1,16 @@
 #[macro_use]
 extern crate rocket;
-use chrono::prelude::*;
 use rocket::form::Form;
 use rocket::http::{Cookie, CookieJar};
 use rocket::response::{Flash, Redirect};
 use rocket::State;
 use rocket_dyn_templates::{context, Template};
 
-use std::cmp::Ordering;
-use std::collections::HashMap;
-use std::sync::Mutex;
-use url::Url;
-
 mod db;
 mod feed;
 
 struct Users(sled::Db);
-struct FeedCache(Mutex<HashMap<String, Vec<FeedItem>>>);
-
-#[derive(Eq, PartialEq, serde::Serialize, Clone)]
-struct FeedItem {
-    date: i64,
-    title: String,
-    link: String,
-    site: String,
-    stale_time: i64,
-}
-
-impl Ord for FeedItem {
-    fn cmp(&self, other: &Self) -> Ordering {
-        self.date.cmp(&other.date)
-    }
-}
-
-impl PartialOrd for FeedItem {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.cmp(other))
-    }
-}
-
-// parses a url and returns the domain
-fn parse_domain(url: String) -> String {
-    let domain = Url::parse(&url);
-    match domain {
-        Ok(v) => v.host_str().unwrap().to_string(),
-        Err(_) => url,
-    }
-}
+struct FeedCache(sled::Db);
 
 fn check_cookie(cookies: &CookieJar<'_>, users: &sled::Db, username: &str) -> bool {
     if let Some(token) = cookies.get("token") {
@@ -79,7 +43,7 @@ fn login_post(
 }
 
 #[post("/<user>/submit", data = "<feeds>")]
-fn feeds_update(
+fn feedsUpdate(
     cookies: &CookieJar<'_>,
     user: &str,
     users: &State<Users>,
@@ -99,7 +63,7 @@ fn feeds_update(
 }
 
 #[get("/<user>/settings")]
-fn settings_page(cookies: &CookieJar<'_>, user: &str, users: &State<Users>) -> Template {
+fn settingsPage(cookies: &CookieJar<'_>, user: &str, users: &State<Users>) -> Template {
     if check_cookie(cookies, &users.0, user) {
         let feed_list = db::get_users_feeds(user, &users.0);
         return Template::render(
@@ -115,7 +79,7 @@ fn settings_page(cookies: &CookieJar<'_>, user: &str, users: &State<Users>) -> T
 }
 
 #[get("/<user>")]
-fn user_page(
+fn userPage(
     cookies: &CookieJar<'_>,
     user: &str,
     users: &State<Users>,
@@ -123,59 +87,10 @@ fn user_page(
 ) -> Template {
     let _logged_in = false;
     let feed_list = db::get_users_feeds(user, &users.0);
-    let mut feed_items: Vec<FeedItem> = vec![];
+    let mut feed_items: Vec<feed::FeedItem> = vec![];
     for addr in feed_list {
-        if let std::collections::hash_map::Entry::Vacant(e) =
-            feed_cache.0.lock().unwrap().entry(addr.clone())
-        {
-            let mut curr_items = vec![];
-            let feed_data: String = ureq::get(&addr)
-                .set("Example-Header", "header value")
-                .call()
-                .unwrap()
-                .into_string()
-                .unwrap();
-            let parsed_feed = feed::parse_feed_data(&feed_data);
-            for entry in parsed_feed.entries {
-                let item = FeedItem {
-                    title: entry.title.unwrap().content,
-                    link: entry.links[0].href.clone(),
-                    date: entry.published.unwrap_or_else(Utc::now).timestamp(),
-                    site: parse_domain(addr.clone()),
-                    stale_time: Utc::now().timestamp(),
-                };
-                feed_items.push(item.clone());
-                curr_items.push(item.clone());
-            }
-            e.insert(curr_items);
-        } else {
-            let items = &mut feed_cache.0.lock().unwrap().get(&addr).unwrap().to_vec();
-            // if the last item in the vector (i.e. the most recent) is stale, reload the feed
-            if items.last().unwrap().stale_time + 600 > Utc::now().timestamp() {
-                items.last_mut().unwrap().stale_time = Utc::now().timestamp(); // gotta do this so we dont infinitley reload the feed if nothing new apears
-                let feed_data: String = ureq::get(&addr)
-                    .set("Example-Header", "header value")
-                    .call()
-                    .unwrap()
-                    .into_string()
-                    .unwrap();
-                let parsed_feed = feed::parse_feed_data(&feed_data);
-                let items_as_links: Vec<String> =
-                    items.iter_mut().map(|x| x.link.clone()).collect();
-                for entry in parsed_feed.entries {
-                    if !(items_as_links.contains(&entry.links[0].href.clone())) {
-                        items.push(FeedItem {
-                            title: entry.title.unwrap().content,
-                            link: entry.links[0].href.clone(),
-                            date: entry.published.unwrap_or_else(Utc::now).timestamp(),
-                            site: parse_domain(addr.clone()),
-                            stale_time: Utc::now().timestamp(),
-                        });
-                    }
-                }
-            }
-            feed_items.append(items);
-        }
+        let mut items = feed::get_feed(addr, &feed_cache.0);
+        feed_items.append(&mut items);
     }
     feed_items.sort();
     feed_items.reverse();
@@ -193,12 +108,12 @@ fn user_page(
 #[launch]
 pub fn rocket() -> _ {
     let users = Users(db::init());
-    let feed_cache = FeedCache(Mutex::new(HashMap::new()));
+    let feed_cache = FeedCache(feed::init());
 
     rocket::build()
         .mount(
             "/",
-            routes![user_page, settings_page, feeds_update, login, login_post],
+            routes![userPage, settingsPage, feedsUpdate, login, login_post],
         )
         .attach(Template::fairing())
         .manage(users)
