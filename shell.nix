@@ -1,4 +1,4 @@
-{ pkgs ? import <nixpkgs> {} }:
+{ pkgs ? import <nixpkgs> { } }:
 
 pkgs.mkShell {
   buildInputs = [
@@ -7,6 +7,5 @@ pkgs.mkShell {
     pkgs.rust-analyzer
 
     # keep this line if you use bash
-    pkgs.bashInteractive
   ];
 }

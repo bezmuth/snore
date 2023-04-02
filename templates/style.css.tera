@@ -1,7 +1,7 @@
 {% raw %}
 html {
   font-family: monospace;
-  max-width: 550px;
+  max-width: 800px;
   margin: 10px auto;
   /* make sure the scrollbar is always shown so
      the width doesnt change between pages */

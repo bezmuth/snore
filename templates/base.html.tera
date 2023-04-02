@@ -13,7 +13,6 @@
     {% block content %}{% endblock content %}
 
       <footer>
-        <nav></nav>
       </footer>
   </body>
 </html>

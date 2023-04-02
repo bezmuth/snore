@@ -8,5 +8,11 @@
 <br>
 <input type="submit" value="update feeds">
 </form>
+<br>
+<form method="POST" action="/logout" method="post">
+    <button name="logout" value="logout">logout</button>
+</form>
+</br>
+</form>
 
 {% endblock content %}

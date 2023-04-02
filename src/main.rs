@@ -41,6 +41,21 @@ fn login_post(
     }
 }
 
+#[post("/register", data = "<register_data>")]
+fn register_post(
+    cookies: &CookieJar<'_>,
+    users: &State<Users>,
+    register_data: Form<Vec<String>>,
+) -> Flash<Redirect> {
+    if let Some(token) = db::try_register(&register_data.clone()[0], &register_data[1], &users.0) {
+        cookies.add(Cookie::new("token", token));
+        cookies.add(Cookie::new("user", register_data[0].clone()));
+        Flash::success(Redirect::to(format!("/{}", register_data[0])), "Login")
+    } else {
+        Flash::error(Redirect::to("/login"), "Register Failed")
+    }
+}
+
 #[post("/<user>/submit", data = "<feeds>")]
 fn feeds_update(
     cookies: &CookieJar<'_>,
@@ -59,6 +74,13 @@ fn feeds_update(
         return Flash::success(Redirect::to(format!("/{}", user)), "Feeds Updated.");
     }
     Flash::error(Redirect::to("/".to_string()), "Error")
+}
+
+#[post("/logout")]
+fn logout(cookies: &CookieJar<'_>) -> Flash<Redirect> {
+    cookies.remove(Cookie::named("user"));
+    cookies.remove(Cookie::named("token"));
+    return Flash::success(Redirect::to("/"), "Logout");
 }
 
 #[get("/<user>/settings")]
@@ -129,7 +151,9 @@ pub fn rocket() -> _ {
                 settings_page,
                 feeds_update,
                 login,
-                login_post
+                login_post,
+                register_post,
+                logout,
             ],
         )
         .attach(Template::fairing())
