@@ -6,3 +6,4 @@ Stuff to note:
 * All feeds are accesible by all users.
 * No async (yet)
 * Written by an insane person that has no idea how to do web security properly
+* I kinda wanna implement activitypub following at some point (i.e. follow mastodon users and have it show up in the feed) but i havent got round to it
