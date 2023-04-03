@@ -48,7 +48,6 @@ pub async fn init() -> Arc<sled::Db> {
     let forever = task::spawn(async move {
         let duration = Duration::from_secs(600);
         loop {
-            sleep(duration);
             if let Ok(Some(first)) = feed_db.first() {
                 if let Ok(Some(last)) = feed_db.last() {
                     println!("Running update");
@@ -78,6 +77,7 @@ pub async fn init() -> Arc<sled::Db> {
                     }
                 }
             }
+            sleep(duration);
         }
     });
 
