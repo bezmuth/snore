@@ -5,12 +5,13 @@ use rocket::http::{Cookie, CookieJar};
 use rocket::response::{Flash, Redirect};
 use rocket::State;
 use rocket_dyn_templates::{context, Template};
+use std::sync::Arc;
 
 mod db;
 mod feed;
 
 struct Users(sled::Db);
-struct FeedCache(sled::Db);
+struct FeedCache(Arc<sled::Db>);
 
 fn check_cookie(cookies: &CookieJar<'_>, users: &sled::Db, username: &str) -> bool {
     if let Some(token) = cookies.get("token") {
@@ -22,12 +23,12 @@ fn check_cookie(cookies: &CookieJar<'_>, users: &sled::Db, username: &str) -> bo
 }
 
 #[get("/login")]
-fn login(_users: &State<Users>) -> Template {
+async fn login(_users: &State<Users>) -> Template {
     Template::render("login", context! {})
 }
 
 #[post("/login", data = "<login_data>")]
-fn login_post(
+async fn login_post(
     cookies: &CookieJar<'_>,
     users: &State<Users>,
     login_data: Form<Vec<String>>,
@@ -42,7 +43,7 @@ fn login_post(
 }
 
 #[post("/register", data = "<register_data>")]
-fn register_post(
+async fn register_post(
     cookies: &CookieJar<'_>,
     users: &State<Users>,
     register_data: Form<Vec<String>>,
@@ -64,7 +65,6 @@ fn feeds_update(
     feeds: Form<String>,
 ) -> Flash<Redirect> {
     if check_cookie(cookies, &users.0, user) {
-        let _feed_list = db::get_users_feeds(user, &users.0);
         let feeds = feeds
             .into_inner()
             .lines()
@@ -100,21 +100,21 @@ fn settings_page(cookies: &CookieJar<'_>, user: &str, users: &State<Users>) -> T
 }
 
 #[get("/<user>")]
-fn user_page(
+async fn user_page(
     cookies: &CookieJar<'_>,
     user: &str,
     users: &State<Users>,
     feed_cache: &State<FeedCache>,
 ) -> Template {
-    let _logged_in = false;
     let feed_list = db::get_users_feeds(user, &users.0);
     let mut feed_items: Vec<feed::FeedItem> = vec![];
     for addr in feed_list {
-        let mut items = feed::get_feed(addr, &feed_cache.0);
-        feed_items.append(&mut items);
+        let items = feed::get_feed(addr, &feed_cache.0);
+        feed_items.append(&mut items.await);
     }
     feed_items.sort();
     feed_items.reverse();
+    println!("feed sort");
 
     Template::render(
         "user",
@@ -138,9 +138,9 @@ fn index(cookies: &CookieJar<'_>) -> Template {
     Template::render("index", context! {logged_in: logged_in, username: user})
 }
 #[launch]
-pub fn rocket() -> _ {
+pub async fn rocket() -> _ {
     let users = Users(db::init());
-    let feed_cache = FeedCache(feed::init());
+    let feed_cache = FeedCache(feed::init().await);
 
     rocket::build()
         .mount(
