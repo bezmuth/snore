@@ -58,18 +58,24 @@ pub async fn init() -> Arc<sled::Db> {
                             .set("Example-Header", "header value")
                             .call()
                         {
-                            let parsed_feed = parse_feed_data(&feed_data.into_string().unwrap());
                             let links: Vec<String> =
                                 feed.clone().into_iter().map(|x| x.link).collect();
-                            for entry in parsed_feed.entries {
-                                if !links.contains(&entry.links[0].href.clone()) {
-                                    let item = FeedItem {
-                                        title: entry.title.unwrap().content,
-                                        link: entry.links[0].href.clone(),
-                                        date: entry.published.unwrap_or_else(Utc::now).timestamp(),
-                                        site: parse_domain(addr.clone()),
-                                    };
-                                    feed.push(item)
+                            if let Ok(parsed_feed) =
+                                parser::parse(feed_data.into_string().unwrap().as_bytes())
+                            {
+                                for entry in parsed_feed.entries {
+                                    if !links.contains(&entry.links[0].href.clone()) {
+                                        let item = FeedItem {
+                                            title: entry.title.unwrap().content,
+                                            link: entry.links[0].href.clone(),
+                                            date: entry
+                                                .published
+                                                .unwrap_or_else(Utc::now)
+                                                .timestamp(),
+                                            site: parse_domain(addr.clone()),
+                                        };
+                                        feed.push(item)
+                                    }
                                 }
                             }
                             update_feed(addr, feed, &feed_db).await;
@@ -84,10 +90,6 @@ pub async fn init() -> Arc<sled::Db> {
     rocket::tokio::spawn(forever);
 
     return db;
-}
-
-fn parse_feed_data(raw_feed: &str) -> feed_rs::model::Feed {
-    parser::parse(raw_feed.as_bytes()).unwrap()
 }
 
 fn decode_feed(feed_bytes: sled::IVec) -> Vec<FeedItem> {
@@ -120,18 +122,21 @@ pub async fn get_feed(addr: String, feed_db: &sled::Db) -> Vec<FeedItem> {
             .unwrap()
             .into_string()
             .unwrap();
-        let parsed_feed = parse_feed_data(&feed_data);
         let mut curr_items: Vec<FeedItem> = vec![];
-        for entry in parsed_feed.entries {
-            let item = FeedItem {
-                title: entry.title.unwrap().content,
-                link: entry.links[0].href.clone(),
-                date: entry.published.unwrap_or_else(Utc::now).timestamp(),
-                site: parse_domain(addr.clone()),
-            };
-            curr_items.push(item.clone());
+        if let Ok(parsed_feed) = parser::parse(feed_data.as_bytes()) {
+            for entry in parsed_feed.entries {
+                let item = FeedItem {
+                    title: entry.title.unwrap().content,
+                    link: entry.links[0].href.clone(),
+                    date: entry.published.unwrap_or_else(Utc::now).timestamp(),
+                    site: parse_domain(addr.clone()),
+                };
+                curr_items.push(item.clone());
+            }
+            update_feed(addr, curr_items.clone(), feed_db).await;
+        } else {
+            println!("Error parsing feed: {}", addr);
         }
-        update_feed(addr, curr_items.clone(), feed_db).await;
         curr_items
     }
 }
